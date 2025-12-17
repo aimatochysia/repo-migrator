@@ -33,10 +33,6 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout empty workspace
-        run: |
-          mkdir work && cd work
-
       - name: Clone source repository
         run: |
           set -e
@@ -46,7 +42,7 @@ jobs:
             "$GITHUB_WORKSPACE/work/source"
           cd "$GITHUB_WORKSPACE/work/source"
           git checkout main
-      
+
       - name: Prepare target repository
         run: |
           set -e
@@ -57,8 +53,11 @@ jobs:
           git checkout --orphan main
           git rm -rf . || true
 
+          echo "Adding source repo as remote"
+          git remote add source "$GITHUB_WORKSPACE/work/source"
+          git fetch source
 
-      - name: Recommit history with author rewrite and copilot squash
+      - name: Recommit history with author rewrite and Copilot squash
         run: |
           set -euo pipefail
 
@@ -67,15 +66,14 @@ jobs:
 
           NEW_AUTHOR_NAME="${{ inputs.author_name }}"
           NEW_AUTHOR_EMAIL="${{ inputs.author_email }}"
-          
+
+          # Ensure committer identity is always set
           export GIT_COMMITTER_NAME="$NEW_AUTHOR_NAME"
           export GIT_COMMITTER_EMAIL="$NEW_AUTHOR_EMAIL"
-          
-          
+
           echo "Starting history rewrite"
 
           cd "$SRC_DIR"
-          # Get commits from oldest to newest
           COMMITS=$(git rev-list --reverse main)
 
           cd "$TGT_DIR"
@@ -85,7 +83,6 @@ jobs:
           SQUASHING=false
 
           for COMMIT in $COMMITS; do
-            cd "$SRC_DIR"
             AUTHOR_NAME=$(git show -s --format='%an' $COMMIT)
             AUTHOR_EMAIL=$(git show -s --format='%ae' $COMMIT)
             AUTHOR_DATE=$(git show -s --format='%aI' $COMMIT)
@@ -100,8 +97,6 @@ jobs:
               IS_COPILOT=true
             fi
 
-            cd "$TGT_DIR"
-
             if [ "$IS_COPILOT" = true ]; then
               echo "  -> Identified as Copilot commit, squashing"
               SQUASHING=true
@@ -112,64 +107,47 @@ jobs:
               continue
             fi
 
-            # If we were squashing and now hit non-copilot, commit the squash first
             if [ "$SQUASHING" = true ]; then
               echo "Committing squashed Copilot commits"
               git add -A || true
-              
               GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
               GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
               GIT_AUTHOR_DATE="$CURRENT_SQUASH_DATE" \
-              GIT_COMMITTER_NAME="$NEW_AUTHOR_NAME" \
-              GIT_COMMITTER_EMAIL="$NEW_AUTHOR_EMAIL" \
               GIT_COMMITTER_DATE="$CURRENT_SQUASH_DATE" \
               git commit --allow-empty -m "Squashed Copilot commits$CURRENT_SQUASH_MSG"
 
-              echo "  -> Squashed commit created"
               CURRENT_SQUASH_MSG=""
               CURRENT_SQUASH_DATE=""
               SQUASHING=false
             fi
 
             echo "Cherry-picking commit $COMMIT"
-            cd "$TGT_DIR"
-            
-            git cherry-pick --no-commit "$COMMIT"
-            
-            echo "Recommitting with rewritten author"
+            git cherry-pick --no-commit "source/$COMMIT"
+
             git add -A
-            
             GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
             GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_AUTHOR_DATE="$AUTHOR_DATE" \
-            GIT_COMMITTER_NAME="$NEW_AUTHOR_NAME" \
-            GIT_COMMITTER_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_COMMITTER_DATE="$AUTHOR_DATE" \
             git commit -m "$COMMIT_MSG"
-
 
             echo "  -> Commit created for $COMMIT"
           done
 
-          # Final squash if history ends with copilot commits
           if [ "$SQUASHING" = true ]; then
             echo "Finalizing trailing Copilot squash"
             git add -A || true
-            
             GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
             GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_AUTHOR_DATE="$CURRENT_SQUASH_DATE" \
-            GIT_COMMITTER_NAME="$NEW_AUTHOR_NAME" \
-            GIT_COMMITTER_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_COMMITTER_DATE="$CURRENT_SQUASH_DATE" \
             git commit --allow-empty -m "Squashed Copilot commits$CURRENT_SQUASH_MSG"
-
           fi
 
       - name: Push rewritten history to target
         run: |
           set -e
-          cd work/target
+          cd "$GITHUB_WORKSPACE/work/target"
           echo "Pushing rewritten history to target repo"
           git branch -M main
           git push -f https://x-access-token:${PAT}@github.com/${{ inputs.target_repo }}.git main
