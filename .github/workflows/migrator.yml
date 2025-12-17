@@ -132,12 +132,10 @@ jobs:
             fi
 
             echo "Cherry-picking commit $COMMIT"
-            cd "$SRC_DIR"
-            git format-patch -1 $COMMIT --stdout > /tmp/patch.diff
-
             cd "$TGT_DIR"
-            git apply /tmp/patch.diff
-
+            
+            git cherry-pick --no-commit "$COMMIT"
+            
             echo "Recommitting with rewritten author"
             git add -A
             
@@ -148,6 +146,7 @@ jobs:
             GIT_COMMITTER_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_COMMITTER_DATE="$AUTHOR_DATE" \
             git commit -m "$COMMIT_MSG"
+
 
             echo "  -> Commit created for $COMMIT"
           done
