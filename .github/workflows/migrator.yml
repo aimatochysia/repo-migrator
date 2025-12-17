@@ -122,7 +122,7 @@ jobs:
             fi
 
             echo "Cherry-picking commit $COMMIT"
-            git cherry-pick --no-commit "source/$COMMIT"
+            git cherry-pick --no-commit "$COMMIT"
 
             git add -A
             GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
