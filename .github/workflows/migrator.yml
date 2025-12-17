@@ -61,11 +61,8 @@ jobs:
           # Also remove any untracked files
           git clean -fdx
           
-          # Delete the main branch if it exists
-          git branch -D main 2>/dev/null || true
-          
-          # Rename temp branch to main
-          git branch -m temp-branch main
+          # Rename temp branch to main (will delete old main if it exists)
+          git branch -M temp-branch main
           
           echo "Adding source repo as remote"
           git remote add source "$GITHUB_WORKSPACE/work/source"
@@ -126,7 +123,7 @@ jobs:
             if [ "$IS_COPILOT" = true ]; then
               echo "  -> Identified as Copilot commit, squashing"
               SQUASHING=true
-              CURRENT_SQUASH_MSG+="\n--- Squashed commit $COMMIT ---\n$COMMIT_MSG\n"
+              CURRENT_SQUASH_MSG="${CURRENT_SQUASH_MSG}\n--- Squashed commit $COMMIT ---\n$COMMIT_MSG\n"
               if [ -z "$CURRENT_SQUASH_DATE" ]; then
                 CURRENT_SQUASH_DATE="$AUTHOR_DATE"
               fi
