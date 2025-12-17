@@ -50,9 +50,20 @@ jobs:
           git clone https://x-access-token:${PAT}@github.com/${{ inputs.target_repo }}.git \
             "$GITHUB_WORKSPACE/work/target"
           cd "$GITHUB_WORKSPACE/work/target"
-          git checkout --orphan main
-          git rm -rf . || true
-
+          
+          echo "Cleaning target repository completely"
+          # Create a fresh orphan branch (no history)
+          git checkout --orphan temp-branch
+          
+          # Remove all files from git tracking
+          git rm -rf . 2>/dev/null || true
+          
+          # Also remove any untracked files
+          git clean -fdx
+          
+          # Rename temp branch to main (will delete old main if it exists)
+          git branch -M temp-branch main
+          
           echo "Adding source repo as remote"
           git remote add source "$GITHUB_WORKSPACE/work/source"
           git fetch source
@@ -83,6 +94,7 @@ jobs:
           SQUASHING=false
 
           for COMMIT in $COMMITS; do
+            cd "$SRC_DIR"
             AUTHOR_NAME=$(git show -s --format='%an' $COMMIT)
             AUTHOR_EMAIL=$(git show -s --format='%ae' $COMMIT)
             AUTHOR_DATE=$(git show -s --format='%aI' $COMMIT)
@@ -90,6 +102,8 @@ jobs:
 
             # Check if this is a merge commit (has more than one parent)
             PARENT_COUNT=$(git rev-list --parents -n 1 $COMMIT | awk '{print NF-1}')
+
+            cd "$TGT_DIR"
 
             echo "Processing commit $COMMIT"
             echo "  Original author: $AUTHOR_NAME <$AUTHOR_EMAIL>"
@@ -109,9 +123,18 @@ jobs:
             if [ "$IS_COPILOT" = true ]; then
               echo "  -> Identified as Copilot commit, squashing"
               SQUASHING=true
-              CURRENT_SQUASH_MSG+="\n--- Squashed commit $COMMIT ---\n$COMMIT_MSG\n"
+              CURRENT_SQUASH_MSG="${CURRENT_SQUASH_MSG}\n--- Squashed commit $COMMIT ---\n$COMMIT_MSG\n"
               if [ -z "$CURRENT_SQUASH_DATE" ]; then
                 CURRENT_SQUASH_DATE="$AUTHOR_DATE"
+              fi
+              
+              # Apply this Copilot commit's changes to working tree without committing
+              echo "  -> Applying changes from $COMMIT to working tree"
+              if ! git cherry-pick --no-commit "$COMMIT" >/dev/null 2>&1; then
+                echo "  -> Cherry-pick had conflicts, resolving with theirs strategy"
+                # Accept all changes from the commit being cherry-picked
+                git checkout --theirs . 2>/dev/null || true
+                git add -A
               fi
               continue
             fi
@@ -131,7 +154,12 @@ jobs:
             fi
 
             echo "Cherry-picking commit $COMMIT"
-            git cherry-pick --no-commit "$COMMIT"
+            if ! git cherry-pick --no-commit "$COMMIT" >/dev/null 2>&1; then
+              echo "  -> Cherry-pick had conflicts, resolving with theirs strategy"
+              # Accept all changes from the commit being cherry-picked
+              git checkout --theirs . 2>/dev/null || true
+              git add -A
+            fi
 
             git add -A
             GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
