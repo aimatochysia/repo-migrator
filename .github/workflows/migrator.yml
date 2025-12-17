@@ -40,19 +40,23 @@ jobs:
       - name: Clone source repository
         run: |
           set -e
+          mkdir -p "$GITHUB_WORKSPACE/work"
           echo "Cloning source repo ${{ inputs.source_repo }}"
-          git clone https://x-access-token:${PAT}@github.com/${{ inputs.source_repo }}.git source
-          cd source
+          git clone https://x-access-token:${PAT}@github.com/${{ inputs.source_repo }}.git \
+            "$GITHUB_WORKSPACE/work/source"
+          cd "$GITHUB_WORKSPACE/work/source"
           git checkout main
-
+      
       - name: Prepare target repository
         run: |
           set -e
           echo "Cloning target repo ${{ inputs.target_repo }}"
-          git clone https://x-access-token:${PAT}@github.com/${{ inputs.target_repo }}.git target
-          cd target
-          git checkout --orphan main-rewritten || git checkout -b main-rewritten
+          git clone https://x-access-token:${PAT}@github.com/${{ inputs.target_repo }}.git \
+            "$GITHUB_WORKSPACE/work/target"
+          cd "$GITHUB_WORKSPACE/work/target"
+          git checkout --orphan main
           git rm -rf . || true
+
 
       - name: Recommit history with author rewrite and copilot squash
         run: |
