@@ -89,9 +89,39 @@ jobs:
 
           cd "$TGT_DIR"
 
-          CURRENT_SQUASH_MSG=""
+          # Arrays to track squashed Copilot commits
+          SQUASH_TITLES=()
+          SQUASH_BODIES=()
           CURRENT_SQUASH_DATE=""
           SQUASHING=false
+
+          # Function to clean commit message (remove Co-authored-by lines)
+          clean_commit_message() {
+            local msg="$1"
+            echo "$msg" | grep -v "^Co-authored-by:" | sed '/^$/N;/^\n$/D'
+          }
+
+          # Function to select random commit title (excluding merge/squash keywords)
+          select_commit_title() {
+            local titles=("$@")
+            local valid_titles=()
+            
+            for title in "${titles[@]}"; do
+              if ! echo "$title" | grep -qiE "(merge|squash)"; then
+                valid_titles+=("$title")
+              fi
+            done
+            
+            if [ ${#valid_titles[@]} -eq 0 ]; then
+              # If no valid titles, use a default
+              echo "Update code"
+              return
+            fi
+            
+            # Select random title
+            local idx=$((RANDOM % ${#valid_titles[@]}))
+            echo "${valid_titles[$idx]}"
+          }
 
           for COMMIT in $COMMITS; do
             cd "$SRC_DIR"
@@ -99,6 +129,7 @@ jobs:
             AUTHOR_EMAIL=$(git show -s --format='%ae' $COMMIT)
             AUTHOR_DATE=$(git show -s --format='%aI' $COMMIT)
             COMMIT_MSG=$(git show -s --format='%B' $COMMIT)
+            COMMIT_SUBJECT=$(git show -s --format='%s' $COMMIT)
 
             # Check if this is a merge commit (has more than one parent)
             PARENT_COUNT=$(git rev-list --parents -n 1 $COMMIT | awk '{print NF-1}')
@@ -123,7 +154,14 @@ jobs:
             if [ "$IS_COPILOT" = true ]; then
               echo "  -> Identified as Copilot commit, squashing"
               SQUASHING=true
-              CURRENT_SQUASH_MSG="${CURRENT_SQUASH_MSG}\n--- Squashed commit $COMMIT ---\n$COMMIT_MSG\n"
+              
+              # Store commit title and cleaned body
+              SQUASH_TITLES+=("$COMMIT_SUBJECT")
+              CLEANED_MSG=$(clean_commit_message "$COMMIT_MSG")
+              if [ -n "$CLEANED_MSG" ]; then
+                SQUASH_BODIES+=("$CLEANED_MSG")
+              fi
+              
               if [ -z "$CURRENT_SQUASH_DATE" ]; then
                 CURRENT_SQUASH_DATE="$AUTHOR_DATE"
               fi
@@ -142,13 +180,31 @@ jobs:
             if [ "$SQUASHING" = true ]; then
               echo "Committing squashed Copilot commits"
               git add -A || true
+              
+              # Select a random title from collected titles
+              FINAL_TITLE=$(select_commit_title "${SQUASH_TITLES[@]}")
+              
+              # Combine bodies (if any)
+              FINAL_BODY=""
+              if [ ${#SQUASH_BODIES[@]} -gt 0 ]; then
+                FINAL_BODY=$(printf "%s\n\n" "${SQUASH_BODIES[@]}")
+              fi
+              
+              # Create commit with selected title and cleaned body
+              FINAL_MSG="${FINAL_TITLE}"
+              if [ -n "$FINAL_BODY" ]; then
+                FINAL_MSG="${FINAL_TITLE}\n\n${FINAL_BODY}"
+              fi
+              
               GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
               GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
               GIT_AUTHOR_DATE="$CURRENT_SQUASH_DATE" \
               GIT_COMMITTER_DATE="$CURRENT_SQUASH_DATE" \
-              git commit --allow-empty -m "Squashed Copilot commits$CURRENT_SQUASH_MSG"
+              git commit --allow-empty -m "$(echo -e "$FINAL_MSG")"
 
-              CURRENT_SQUASH_MSG=""
+              # Reset squash tracking
+              SQUASH_TITLES=()
+              SQUASH_BODIES=()
               CURRENT_SQUASH_DATE=""
               SQUASHING=false
             fi
@@ -162,11 +218,15 @@ jobs:
             fi
 
             git add -A
+            
+            # Clean the commit message before committing
+            CLEANED_COMMIT_MSG=$(clean_commit_message "$COMMIT_MSG")
+            
             GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
             GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_AUTHOR_DATE="$AUTHOR_DATE" \
             GIT_COMMITTER_DATE="$AUTHOR_DATE" \
-            git commit -m "$COMMIT_MSG"
+            git commit -m "$CLEANED_COMMIT_MSG"
 
             echo "  -> Commit created for $COMMIT"
           done
@@ -174,11 +234,27 @@ jobs:
           if [ "$SQUASHING" = true ]; then
             echo "Finalizing trailing Copilot squash"
             git add -A || true
+            
+            # Select a random title from collected titles
+            FINAL_TITLE=$(select_commit_title "${SQUASH_TITLES[@]}")
+            
+            # Combine bodies (if any)
+            FINAL_BODY=""
+            if [ ${#SQUASH_BODIES[@]} -gt 0 ]; then
+              FINAL_BODY=$(printf "%s\n\n" "${SQUASH_BODIES[@]}")
+            fi
+            
+            # Create commit with selected title and cleaned body
+            FINAL_MSG="${FINAL_TITLE}"
+            if [ -n "$FINAL_BODY" ]; then
+              FINAL_MSG="${FINAL_TITLE}\n\n${FINAL_BODY}"
+            fi
+            
             GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
             GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
             GIT_AUTHOR_DATE="$CURRENT_SQUASH_DATE" \
             GIT_COMMITTER_DATE="$CURRENT_SQUASH_DATE" \
-            git commit --allow-empty -m "Squashed Copilot commits$CURRENT_SQUASH_MSG"
+            git commit --allow-empty -m "$(echo -e "$FINAL_MSG")"
           fi
 
       - name: Push rewritten history to target

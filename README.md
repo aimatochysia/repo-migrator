@@ -9,8 +9,9 @@ The `migrator.yml` workflow allows you to:
 1. **Migrate Complete Commit History**: Transfer all commits from the main branch of a source repository to a target repository
 2. **Rewrite Author Attribution**: Assign all commits to a specified author and committer
 3. **Squash Copilot Commits**: Automatically detect and squash commits made by GitHub Copilot into single commits
-4. **Handle Merge Conflicts**: Automatically resolve conflicts by accepting changes from the source repository
-5. **Clean Target Repository**: Completely clean the target repository before migration to ensure a fresh start
+4. **Clean Commit Messages**: Remove "Co-authored-by:" lines from all commit messages
+5. **Handle Merge Conflicts**: Automatically resolve conflicts by accepting changes from the source repository
+6. **Clean Target Repository**: Completely clean the target repository before migration to ensure a fresh start
 
 ## How It Works
 
@@ -23,9 +24,10 @@ The workflow performs the following steps:
    - Iterates through all commits in the source repository's main branch
    - Skips merge commits (their changes are already included via parent commits)
    - Identifies Copilot commits and accumulates them for squashing
+   - Removes "Co-authored-by:" lines from all commit messages
    - Cherry-picks each commit with the new author/committer information
    - Automatically resolves merge conflicts using the "theirs" strategy (accepting changes from source)
-   - Commits squashed Copilot changes when a non-Copilot commit is encountered
+   - Commits squashed Copilot changes with a randomly selected title (excluding merge/squash keywords) when a non-Copilot commit is encountered
 5. **Pushes to Target**: Force-pushes the rewritten history to the target repository
 
 ## Usage
@@ -68,7 +70,11 @@ The workflow automatically resolves merge conflicts by accepting changes from th
 
 ### Copilot Commit Squashing
 
-Commits authored by GitHub Copilot (identified by "copilot" in the author name or email) are automatically detected and squashed together. This keeps the target repository's history cleaner by combining automated commits.
+Commits authored by GitHub Copilot (identified by "copilot" in the author name or email) are automatically detected and squashed together. When squashing:
+- A random commit title is selected from the squashed commits (excluding titles containing "merge" or "squash")
+- "Co-authored-by:" lines are removed from commit messages
+- The commit is attributed only to the specified author/committer (no Copilot references)
+- This keeps the target repository's history cleaner by combining automated commits while maintaining a natural appearance
 
 ### Preserved Commit Dates
 
