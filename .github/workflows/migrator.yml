@@ -98,7 +98,7 @@ jobs:
           # Function to clean commit message (remove Co-authored-by lines)
           clean_commit_message() {
             local msg="$1"
-            echo "$msg" | grep -v "^Co-authored-by:" | sed '/^$/N;/^\n$/D'
+            echo "$msg" | grep -v "^Co-authored-by:" | sed '/^$/d'
           }
 
           # Function to select random commit title (excluding merge/squash keywords)
@@ -121,6 +121,36 @@ jobs:
             # Select random title
             local idx=$((RANDOM % ${#valid_titles[@]}))
             echo "${valid_titles[$idx]}"
+          }
+
+          # Function to create squashed commit
+          create_squash_commit() {
+            local date="$1"
+            shift
+            local titles=("$@")
+            
+            git add -A || true
+            
+            # Select a random title from collected titles
+            FINAL_TITLE=$(select_commit_title "${titles[@]}")
+            
+            # Combine bodies (if any)
+            FINAL_BODY=""
+            if [ ${#SQUASH_BODIES[@]} -gt 0 ]; then
+              FINAL_BODY=$(printf "%s\n\n" "${SQUASH_BODIES[@]}")
+            fi
+            
+            # Create commit with selected title and cleaned body
+            FINAL_MSG="${FINAL_TITLE}"
+            if [ -n "$FINAL_BODY" ]; then
+              FINAL_MSG="${FINAL_TITLE}\n\n${FINAL_BODY}"
+            fi
+            
+            GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
+            GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
+            GIT_AUTHOR_DATE="$date" \
+            GIT_COMMITTER_DATE="$date" \
+            git commit --allow-empty -m "$(echo -e "$FINAL_MSG")"
           }
 
           for COMMIT in $COMMITS; do
@@ -179,28 +209,7 @@ jobs:
 
             if [ "$SQUASHING" = true ]; then
               echo "Committing squashed Copilot commits"
-              git add -A || true
-              
-              # Select a random title from collected titles
-              FINAL_TITLE=$(select_commit_title "${SQUASH_TITLES[@]}")
-              
-              # Combine bodies (if any)
-              FINAL_BODY=""
-              if [ ${#SQUASH_BODIES[@]} -gt 0 ]; then
-                FINAL_BODY=$(printf "%s\n\n" "${SQUASH_BODIES[@]}")
-              fi
-              
-              # Create commit with selected title and cleaned body
-              FINAL_MSG="${FINAL_TITLE}"
-              if [ -n "$FINAL_BODY" ]; then
-                FINAL_MSG="${FINAL_TITLE}\n\n${FINAL_BODY}"
-              fi
-              
-              GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
-              GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
-              GIT_AUTHOR_DATE="$CURRENT_SQUASH_DATE" \
-              GIT_COMMITTER_DATE="$CURRENT_SQUASH_DATE" \
-              git commit --allow-empty -m "$(echo -e "$FINAL_MSG")"
+              create_squash_commit "$CURRENT_SQUASH_DATE" "${SQUASH_TITLES[@]}"
 
               # Reset squash tracking
               SQUASH_TITLES=()
@@ -233,28 +242,7 @@ jobs:
 
           if [ "$SQUASHING" = true ]; then
             echo "Finalizing trailing Copilot squash"
-            git add -A || true
-            
-            # Select a random title from collected titles
-            FINAL_TITLE=$(select_commit_title "${SQUASH_TITLES[@]}")
-            
-            # Combine bodies (if any)
-            FINAL_BODY=""
-            if [ ${#SQUASH_BODIES[@]} -gt 0 ]; then
-              FINAL_BODY=$(printf "%s\n\n" "${SQUASH_BODIES[@]}")
-            fi
-            
-            # Create commit with selected title and cleaned body
-            FINAL_MSG="${FINAL_TITLE}"
-            if [ -n "$FINAL_BODY" ]; then
-              FINAL_MSG="${FINAL_TITLE}\n\n${FINAL_BODY}"
-            fi
-            
-            GIT_AUTHOR_NAME="$NEW_AUTHOR_NAME" \
-            GIT_AUTHOR_EMAIL="$NEW_AUTHOR_EMAIL" \
-            GIT_AUTHOR_DATE="$CURRENT_SQUASH_DATE" \
-            GIT_COMMITTER_DATE="$CURRENT_SQUASH_DATE" \
-            git commit --allow-empty -m "$(echo -e "$FINAL_MSG")"
+            create_squash_commit "$CURRENT_SQUASH_DATE" "${SQUASH_TITLES[@]}"
           fi
 
       - name: Push rewritten history to target
