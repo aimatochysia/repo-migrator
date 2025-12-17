@@ -65,7 +65,7 @@ jobs:
           git branch -D main 2>/dev/null || true
           
           # Rename temp branch to main
-          git checkout -b main
+          git branch -m temp-branch main
           
           echo "Adding source repo as remote"
           git remote add source "$GITHUB_WORKSPACE/work/source"
@@ -133,7 +133,7 @@ jobs:
               
               # Apply this Copilot commit's changes to working tree without committing
               echo "  -> Applying changes from $COMMIT to working tree"
-              if ! git cherry-pick --no-commit "$COMMIT" 2>&1; then
+              if ! git cherry-pick --no-commit "$COMMIT" >/dev/null 2>&1; then
                 echo "  -> Cherry-pick had conflicts, resolving with theirs strategy"
                 # Accept all changes from the commit being cherry-picked
                 git checkout --theirs . 2>/dev/null || true
@@ -157,7 +157,7 @@ jobs:
             fi
 
             echo "Cherry-picking commit $COMMIT"
-            if ! git cherry-pick --no-commit "$COMMIT" 2>&1; then
+            if ! git cherry-pick --no-commit "$COMMIT" >/dev/null 2>&1; then
               echo "  -> Cherry-pick had conflicts, resolving with theirs strategy"
               # Accept all changes from the commit being cherry-picked
               git checkout --theirs . 2>/dev/null || true
