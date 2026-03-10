@@ -36,6 +36,7 @@ The workflow performs the following steps:
 
 1. A Personal Access Token (PAT) with appropriate permissions:
    - `repo` scope (full repository access)
+   - `workflow` scope (required if the source repository contains GitHub Actions workflow files in `.github/workflows/`)
    - Permissions to read from the source repository
    - Permissions to write to the target repository
 
@@ -51,6 +52,7 @@ The workflow performs the following steps:
    - **Target repository**: The repository to migrate to (format: `owner/name`)
    - **Author name**: The name to use for all commits (e.g., "John Doe")
    - **Author email**: The email to use for all commits (e.g., "john.doe@example.com")
+   - **Skip workflow files** *(optional)*: Set to `true` to exclude `.github/workflows/` files from migration. Useful if your PAT does not have the `workflow` scope.
 5. Click **"Run workflow"**
 
 ### Example
@@ -60,6 +62,7 @@ Source repository: octocat/hello-world
 Target repository: myorg/new-hello-world
 Author name: John Doe
 Author email: john.doe@example.com
+Skip workflow files: false
 ```
 
 ## Features
@@ -96,9 +99,10 @@ Merge commits are automatically skipped because their changes are already includ
 If the workflow fails:
 
 1. **PAT Issues**: Verify the PAT secret is correctly set and has the necessary permissions
-2. **Repository Access**: Ensure the PAT has access to both source and target repositories
-3. **Branch Names**: The workflow assumes both repositories use `main` as the default branch
-4. **Conflict Resolution**: If automatic conflict resolution fails, check the workflow logs for details
+2. **Workflow scope error**: If you see an error like `refusing to allow a Personal Access Token to create or update workflow ... without 'workflow' scope`, the source repository contains GitHub Actions workflow files. Either add the `workflow` scope to your PAT, or re-run the workflow with **skip_workflow_files** set to `true` to exclude workflow files from migration.
+3. **Repository Access**: Ensure the PAT has access to both source and target repositories
+4. **Branch Names**: The workflow assumes both repositories use `main` as the default branch
+5. **Conflict Resolution**: If automatic conflict resolution fails, check the workflow logs for details
 
 ## Security Considerations
 
