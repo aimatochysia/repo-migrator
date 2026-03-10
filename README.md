@@ -99,7 +99,7 @@ Merge commits are automatically skipped because their changes are already includ
 If the workflow fails:
 
 1. **PAT Issues**: Verify the PAT secret is correctly set and has the necessary permissions
-2. **Workflow scope error**: If you see an error like `refusing to allow a Personal Access Token to create or update workflow ... without 'workflow' scope`, the source repository contains GitHub Actions workflow files. Either add the `workflow` scope to your PAT, or re-run the workflow with **skip_workflow_files** set to `true` to exclude workflow files from migration.
+2. **Workflow Scope Error**: If you see an error like `refusing to allow a Personal Access Token to create or update workflow ... without 'workflow' scope`, the source repository contains GitHub Actions workflow files. Either add the `workflow` scope to your PAT, or re-run the workflow with **skip_workflow_files** set to `true` to exclude workflow files from migration.
 3. **Repository Access**: Ensure the PAT has access to both source and target repositories
 4. **Branch Names**: The workflow assumes both repositories use `main` as the default branch
 5. **Conflict Resolution**: If automatic conflict resolution fails, check the workflow logs for details

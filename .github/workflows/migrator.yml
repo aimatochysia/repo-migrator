@@ -270,8 +270,12 @@ jobs:
           if [ -d ".github/workflows" ]; then
             echo "Removing .github/workflows from target (skip_workflow_files is enabled)"
             git rm -rf .github/workflows
-            git commit -m "Remove workflow files (excluded from migration)" \
-              --author="${{ inputs.author_name }} <${{ inputs.author_email }}>" || true
+            if git diff --cached --quiet; then
+              echo "No workflow files were tracked — nothing to commit."
+            else
+              git commit -m "Remove workflow files (excluded from migration)" \
+                --author="${{ inputs.author_name }} <${{ inputs.author_email }}>"
+            fi
           fi
 
       - name: Push rewritten history to target
