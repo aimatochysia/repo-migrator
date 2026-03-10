@@ -19,11 +19,6 @@ on:
         description: "New author email for all commits, e.g. john.doe@example.com"
         required: true
         type: string
-      skip_workflow_files:
-        description: "Skip .github/workflows files during migration (set to true if your PAT lacks the 'workflow' scope)"
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   recommit:
@@ -47,18 +42,6 @@ jobs:
             "$GITHUB_WORKSPACE/work/source"
           cd "$GITHUB_WORKSPACE/work/source"
           git checkout main
-
-      - name: Check for workflow files in source repository
-        run: |
-          cd "$GITHUB_WORKSPACE/work/source"
-          if [ -d ".github/workflows" ] && [ "$(ls -A .github/workflows 2>/dev/null)" ]; then
-            echo "::warning::Source repository contains GitHub Actions workflow files in .github/workflows/."
-            if [ "${{ inputs.skip_workflow_files }}" = "true" ]; then
-              echo "skip_workflow_files is enabled — workflow files will be excluded from migration."
-            else
-              echo "::warning::Your PAT must have the 'workflow' scope to push workflow files to the target repository. If the push fails, either add the 'workflow' scope to your PAT or re-run with skip_workflow_files=true."
-            fi
-          fi
 
       - name: Prepare target repository
         run: |
@@ -260,22 +243,6 @@ jobs:
           if [ "$SQUASHING" = true ]; then
             echo "Finalizing trailing Copilot squash"
             create_squash_commit "$CURRENT_SQUASH_DATE" "${SQUASH_TITLES[@]}"
-          fi
-
-      - name: Remove workflow files if skip_workflow_files is enabled
-        if: ${{ inputs.skip_workflow_files == true }}
-        run: |
-          set -e
-          cd "$GITHUB_WORKSPACE/work/target"
-          if [ -d ".github/workflows" ]; then
-            echo "Removing .github/workflows from target (skip_workflow_files is enabled)"
-            git rm -rf .github/workflows
-            if git diff --cached --quiet; then
-              echo "No workflow files were tracked — nothing to commit."
-            else
-              git commit -m "Remove workflow files (excluded from migration)" \
-                --author="${{ inputs.author_name }} <${{ inputs.author_email }}>"
-            fi
           fi
 
       - name: Push rewritten history to target
