@@ -36,6 +36,7 @@ The workflow performs the following steps:
 
 1. A Personal Access Token (PAT) with appropriate permissions:
    - `repo` scope (full repository access)
+   - `workflow` scope (required to push GitHub Actions workflow files)
    - Permissions to read from the source repository
    - Permissions to write to the target repository
 
@@ -96,9 +97,10 @@ Merge commits are automatically skipped because their changes are already includ
 If the workflow fails:
 
 1. **PAT Issues**: Verify the PAT secret is correctly set and has the necessary permissions
-2. **Repository Access**: Ensure the PAT has access to both source and target repositories
-3. **Branch Names**: The workflow assumes both repositories use `main` as the default branch
-4. **Conflict Resolution**: If automatic conflict resolution fails, check the workflow logs for details
+2. **Workflow Scope Error**: If you see an error like `refusing to allow a Personal Access Token to create or update workflow ... without 'workflow' scope`, your PAT is missing the `workflow` scope. Regenerate or update your PAT to include both `repo` and `workflow` scopes, then update the `PAT` secret in the repository settings.
+3. **Repository Access**: Ensure the PAT has access to both source and target repositories
+4. **Branch Names**: The workflow assumes both repositories use `main` as the default branch
+5. **Conflict Resolution**: If automatic conflict resolution fails, check the workflow logs for details
 
 ## Security Considerations
 
